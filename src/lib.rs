@@ -34,6 +34,11 @@
 //! assert_eq!( name.firstname, "Albert" );
 //! assert_eq!( name.lastname, "Einstein" );
 //! ```
+//!
+//! ## Performance
+//!
+//! `SharedString` can increase the perfomance in certain cases up to 20% or more.
+//! See `benches/benchmark.rs` for benchmarks.
 
 #[doc(hidden)]
 pub mod as_range_inclusive;
@@ -239,11 +244,19 @@ where R: RefCounter {
 	}
 
 	#[inline]
+	fn pos( &self ) -> (usize, usize) {
+		match self.pos {
+			Some(p) => p,
+			None => ( 0, self.bytes.len().saturating_sub(1) )
+		}
+	}
+
+	#[inline]
 	fn calc_range<I>( &self, range: I ) -> Option<(usize, usize)>
 	where I: AsRangeInclusive {
 
 		let (start, end) = self.pos();
-		let mut range = range.as_range_inclusive( end );
+		let mut range = range.as_range_inclusive( end - start );
 		if range.1 <= range.0 {
 			return None }
 
@@ -251,8 +264,7 @@ where R: RefCounter {
 		range.1 += start;
 
 		if range.1 > end {
-			return None
-		}
+			return None }
 
 		Some( range )
 	}
@@ -436,14 +448,6 @@ where R: RefCounter {
 		let mut s = self.into_string();
 		s.push_str( string );
 		s
-	}
-
-	#[inline]
-	fn pos( &self ) -> (usize, usize) {
-		match self.pos {
-			Some(p) => p,
-			None => ( 0, self.bytes.len().saturating_sub(1) )
-		}
 	}
 
 	/// Splits the `SharedString` into two at the given index.
@@ -820,6 +824,46 @@ mod tests {
 		let mut lines = empty.lines();
 		assert_eq!( " ", lines.next().unwrap() );
 		assert_eq!( lines.next(), None );
+
+	}
+
+	#[test]
+	fn range_eq_str_range() {
+
+		let line = "foo: bar";
+		let at = line.find(':').unwrap();
+		let key = &line[..at];
+		let value = &line[(at + 2)..];
+
+		assert_eq!( key, "foo" );
+		assert_eq!( value, "bar" );
+
+		let line = SharedString::from(line);
+		let key = line.idx(..at);
+		let value = line.idx((at + 2)..);
+
+		assert_eq!( key, "foo" );
+		assert_eq!( value, "bar" );
+
+	}
+
+	#[test]
+	fn range_in_range() {
+
+		let line = "date: Mon, 30 Nov 2020 22:16:22 GMT\nserver: mw1271.eqiad.wmnet\nx-content-type-options: nosniff";
+		let mut lines = SharedString::from(line).lines();
+
+		let _ = lines.next().unwrap();
+		let line = lines.next().unwrap();
+
+		let at = line.find(':').unwrap();
+		assert_eq!( at, 6 );
+
+		let key = line.idx(..at);
+		assert_eq!( key, "server" );
+
+		let value = line.idx( (at + 2).. );
+		assert_eq!( value, "mw1271.eqiad.wmnet" );
 
 	}
 

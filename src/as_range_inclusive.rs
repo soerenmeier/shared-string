@@ -22,7 +22,7 @@ pub trait AsRangeInclusive: private::Sealed {
 impl AsRangeInclusive for ops::Range<usize> {
 	#[inline]
 	fn as_range_inclusive( self, _: usize ) -> (usize, usize) {
-		(self.start, self.end.max(1) - 1)
+		(self.start, self.end.saturating_sub(1))
 	}
 }
 
