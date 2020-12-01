@@ -1,7 +1,7 @@
 [package]
 name = "shared-string"
 description = "Split a string without another allocation"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Sören Meier <soeren@s-me.ch>"]
 repository = "https://github.com/soerenmeier/shared-string"
 edition = "2018"
@@ -12,3 +12,10 @@ categories = ["data-structures", "parsing"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "benchmark"
+harness = false

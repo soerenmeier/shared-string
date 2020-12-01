@@ -33,3 +33,8 @@ let name = Name::new("Albert Einstein").unwrap();
 assert_eq!( name.firstname, "Albert" );
 assert_eq!( name.lastname, "Einstein" );
 ```
+
+## Performance
+
+`SharedString` can increase the perfomance in certain cases up to 20% or more.
+See `benches/benchmark.rs` for benchmarks.
