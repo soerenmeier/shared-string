@@ -1,0 +1,14 @@
+[package]
+name = "shared-string"
+description = "Split a string without another allocation"
+version = "0.1.0"
+authors = ["Sören Meier <soeren@s-me.ch>"]
+repository = "https://github.com/soerenmeier/shared-string"
+edition = "2018"
+license = "MIT OR Apache-2.0"
+keywords = ["string", "zero-copy"]
+categories = ["data-structures", "parsing-tools"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
