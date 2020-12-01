@@ -7,7 +7,7 @@ repository = "https://github.com/soerenmeier/shared-string"
 edition = "2018"
 license = "MIT OR Apache-2.0"
 keywords = ["string", "zero-copy"]
-categories = ["data-structures", "parsing-tools"]
+categories = ["data-structures", "parsing"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
