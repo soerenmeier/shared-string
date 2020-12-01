@@ -8,7 +8,6 @@ use shared_string::{ SharedString, SharedSyncString };
 use criterion::{ black_box, criterion_group, criterion_main, Criterion };
 
 
-
 // taken from a response from wikipedia.org
 const HTTP_HEADER: &'static str = "\
 date: Mon, 30 Nov 2020 22:16:22 GMT
@@ -30,13 +29,6 @@ x-client-ip: 194.158.250.88
 cache-control: private, s-maxage=0, max-age=0, must-revalidate
 X-Firefox-Spdy: h2\
 ";
-
-
-
-
-
-
-
 
 
 // String
