@@ -1,7 +1,7 @@
 [package]
 name = "shared-string"
 description = "Split a string without another allocation"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Sören Meier <soeren@s-me.ch>"]
 repository = "https://github.com/soerenmeier/shared-string"
 edition = "2018"
