@@ -17,16 +17,16 @@
 //!
 //! struct Name {
 //! 	firstname: SharedString,
-//!		lastname: SharedString
+//! 	lastname: SharedString
 //! }
 //!
 //! impl Name {
-//!		pub fn new( fullname: impl Into<SharedString> ) -> Option<Self> {
-//!			let mut split = fullname.into().split(b' ');
-//!			Some(Self {
-//!				firstname: split.next()?,
-//!				lastname: split.next()?
-//!			})
+//! 	pub fn new( fullname: impl Into<SharedString> ) -> Option<Self> {
+//! 		let mut split = fullname.into().split(b' ');
+//! 		Some(Self {
+//! 			firstname: split.next()?,
+//! 			lastname: split.next()?
+//! 		})
 //! 	}
 //! }
 //!
