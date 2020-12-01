@@ -10,7 +10,7 @@ First try to store references, for example `&str` which is more efficient.
 
 ## Example
 
-```
+```rust
 use shared_string::SharedString;
 // or SharedSyncString if `Sync` is required
 
