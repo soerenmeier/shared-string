@@ -1,7 +1,9 @@
+//! This file contains benchmark
+//!
+//! TODO: functions need better names
 
 use std::collections::HashMap;
 use std::io::{Read, BufReader, BufRead};
-use std::mem;
 
 use shared_string::{SharedString, SharedSyncString};
 
@@ -31,6 +33,7 @@ X-Firefox-Spdy: h2\
 
 // String
 
+// time: ~2.77us
 fn parse_to_string(string: String) -> HashMap<String, String> {
 	let mut map = HashMap::new();
 	for line in string.lines() {
@@ -47,6 +50,7 @@ fn parse_to_string(string: String) -> HashMap<String, String> {
 	map
 }
 
+// time: ~2.05us
 fn parse_to_shared_string(string: String) -> HashMap<SharedString, SharedString> {
 	let string = SharedString::from(string);
 	let mut map = HashMap::new();
@@ -64,6 +68,7 @@ fn parse_to_shared_string(string: String) -> HashMap<SharedString, SharedString>
 	map
 }
 
+// time: ~2.42us
 fn parse_to_shared_sync_string(string: String) -> HashMap<SharedSyncString, SharedSyncString> {
 	let string = SharedSyncString::from(string);
 	let mut map = HashMap::new();
@@ -107,6 +112,7 @@ fn benchmark_string(c: &mut Criterion) {
 
 // BufReader
 
+// time: ~2.09us
 fn parse_to_string_from_buf_reader<T: Read>(mut reader: BufReader<T>) -> HashMap<String, String> {
 	let mut map = HashMap::new();
 	let mut line = String::with_capacity(100);
@@ -128,6 +134,7 @@ fn parse_to_string_from_buf_reader<T: Read>(mut reader: BufReader<T>) -> HashMap
 	map
 }
 
+// time: ~2.14us
 fn parse_to_shared_string_from_buf_reader<T: Read>(
 	mut reader: BufReader<T>
 ) -> HashMap<SharedString, SharedString> {
@@ -149,6 +156,7 @@ fn parse_to_shared_string_from_buf_reader<T: Read>(
 	map
 }
 
+// time: ~2.17us
 fn parse_to_shared_string_from_buf_reader_with_split_off<T: Read>(
 	mut reader: BufReader<T>
 ) -> HashMap<SharedString, SharedString> {
@@ -170,6 +178,7 @@ fn parse_to_shared_string_from_buf_reader_with_split_off<T: Read>(
 	map
 }
 
+// time: ~2.38us
 fn parse_to_shared_sync_string_from_buf_reader<T: Read>(
 	mut reader: BufReader<T>
 ) -> HashMap<SharedSyncString, SharedSyncString> {
@@ -226,7 +235,74 @@ fn benchmark_buf_reader(c: &mut Criterion) {
 	});
 }
 
+// BufReader with a new string for every line
+
+// time: ~1.80us
+fn parse_to_string_from_buf_reader_string<T: Read>(
+	reader: BufReader<T>
+) -> Vec<(String, String)> {
+	let mut lines = reader.lines();
+	let mut vec = Vec::new();
+
+	while let Some(Ok(line)) = lines.next() {
+		// unwrap because we know that in every line is a colon
+		let at = line.find(':').unwrap();
+
+		// we can skip the space here because we know after every colon is a space
+		let value = line[(at + 2)..].to_string();
+		let mut key = line;
+		key.truncate(at);
+
+		vec.push((key, value));
+	}
+
+	vec
+}
+
+// TODO: Optimize this
+// time: ~2.54us
+fn parse_to_shared_string_from_buf_reader_string<T: Read>(
+	reader: BufReader<T>
+) -> Vec<(SharedString, SharedString)> {
+	let mut lines = reader.lines();
+	let mut vec = Vec::new();
+
+	while let Some(Ok(line)) = lines.next() {
+		let line = SharedString::from(line);
+		// unwrap because we know that in every line is a colon
+		let at = line.find(':').unwrap();
+
+		let value = line.idx((at + 2)..);
+		let mut key = line;
+		key.truncate(at);
+
+		vec.push((key, value));
+	}
+
+	vec
+}
+
+fn benchmark_buf_reader_string(c: &mut Criterion) {
+	let bytes = HTTP_HEADER.as_bytes().to_vec();
+
+	c.bench_function("parse_to_string_from_buf_reader_string", |b| {
+		b.iter(|| {
+			let reader = BufReader::new(bytes.as_slice());
+			parse_to_string_from_buf_reader_string(black_box(reader))
+		})
+	});
+
+	c.bench_function("parse_to_shared_string_from_buf_reader_string", |b| {
+		b.iter(|| {
+			let reader = BufReader::new(bytes.as_slice());
+			parse_to_shared_string_from_buf_reader_string(black_box(reader))
+		})
+	});
+}
+
+
 criterion_group!(bench_string, benchmark_string);
 criterion_group!(bench_buf_reader, benchmark_buf_reader);
+criterion_group!(bench_buf_reader_string, benchmark_buf_reader_string);
 
-criterion_main!(bench_string, bench_buf_reader);
+criterion_main!(bench_string, bench_buf_reader, bench_buf_reader_string);
