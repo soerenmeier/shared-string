@@ -520,6 +520,20 @@ where R: RefCounter {
 	pub fn lines(self) -> Lines<R> {
 		Lines::new(self.start, self.len, self.bytes)
 	}
+
+	/// Shortens this `SharedString` to the specified length.
+	///
+	/// If `new_len` is greater than the current length, nothing happens.
+	///
+	/// ## Panics
+	///
+	/// Panics if `new_len` does not lie on a char boundary.
+	#[inline]
+	pub fn truncate(&mut self, new_len: usize) {
+		if new_len < self.len {
+			assert!(self.is_char_boundary(new_len));
+			self.len = new_len;
+		}
 	}
 }
 
@@ -829,5 +843,12 @@ mod tests {
 
 		let value = line.idx((at + 2)..);
 		assert_eq!(value, "mw1271.eqiad.wmnet");
+	}
+
+	#[test]
+	fn truncate() {
+		let mut foobar = SharedString::from("foobar");
+		foobar.truncate(3);
+		assert_eq!(foobar, "foo");
 	}
 }
