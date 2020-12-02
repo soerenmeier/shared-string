@@ -21,7 +21,7 @@
 //! }
 //!
 //! impl Name {
-//! 	pub fn new( fullname: impl Into<SharedString> ) -> Option<Self> {
+//! 	pub fn new(fullname: impl Into<SharedString>) -> Option<Self> {
 //! 		let mut split = fullname.into().split(b' ');
 //! 		Some(Self {
 //! 			firstname: split.next()?,
@@ -31,24 +31,23 @@
 //! }
 //!
 //! let name = Name::new("Albert Einstein").unwrap();
-//! assert_eq!( name.firstname, "Albert" );
-//! assert_eq!( name.lastname, "Einstein" );
+//! assert_eq!(name.firstname, "Albert");
+//! assert_eq!(name.lastname, "Einstein");
 //! ```
 //!
 //! ## Performance
 //!
-//! `SharedString` can increase the perfomance in certain cases up to 20% or more.
-//! See `benches/benchmark.rs` for benchmarks.
+//! `SharedString` can increase the perfomance in certain cases up to 20% or
+//! more. See `benches/benchmark.rs` for benchmarks.
 
 #[doc(hidden)]
 pub mod as_range_inclusive;
 use as_range_inclusive::AsRangeInclusive;
 
 pub mod iter;
-use iter::{ Split, Lines };
+use iter::{Split, Lines};
 
-
-use std::{ ops, str, cmp, fmt, hash, borrow };
+use std::{ops, str, cmp, fmt, hash, borrow};
 use std::rc::Rc;
 use std::sync::Arc;
 use std::string::FromUtf8Error;
@@ -69,9 +68,9 @@ use std::string::FromUtf8Error;
 /// // or SharedSyncString if `Sync` is required
 ///
 /// let lines: Vec<_> = SharedString::from("many\nlines\nmany").lines().collect();
-/// assert_eq!( lines[0], SharedString::from("many") );
-/// assert_eq!( lines[1], "lines" );
-/// assert_eq!( lines.len(), 3 );
+/// assert_eq!(lines[0], SharedString::from("many"));
+/// assert_eq!(lines[1], "lines");
+/// assert_eq!(lines.len(), 3);
 /// ```
 #[derive(Clone)]
 pub struct SharedGenString<R>
@@ -83,11 +82,10 @@ where R: RefCounter {
 	bytes: R
 }
 
-
 /// Use `SharedString` if you only need this type in one thread
-pub type SharedString = SharedGenString< Rc<Box<[u8]>> >;
+pub type SharedString = SharedGenString<Rc<Box<[u8]>>>;
 /// Use `SharedSyncString` if you need to pass it between threads
-pub type SharedSyncString = SharedGenString< Arc<Box<[u8]>> >;
+pub type SharedSyncString = SharedGenString<Arc<Box<[u8]>>>;
 
 /// A trait to allow `SharedString` to be generic over any reference counter.
 ///
@@ -95,42 +93,36 @@ pub type SharedSyncString = SharedGenString< Arc<Box<[u8]>> >;
 ///
 /// Requires the traits `Clone` + `Sized` +
 /// `Deref<Box<[u8]>>` + `From<Box<[u8]>>`
-pub trait RefCounter: Clone + Sized +
-	ops::Deref<Target = Box<[u8]>> +
-	From<Box<[u8]>> {
-
-	fn try_unwrap( self ) -> Result<Box<[u8]>, Self>;
+pub trait RefCounter: Clone + Sized + ops::Deref<Target = Box<[u8]>> + From<Box<[u8]>> {
+	fn try_unwrap(self) -> Result<Box<[u8]>, Self>;
 }
-
 
 impl RefCounter for Rc<Box<[u8]>> {
 	#[inline]
-	fn try_unwrap( self ) -> Result<Box<[u8]>, Self> {
-		Rc::try_unwrap( self )
+	fn try_unwrap(self) -> Result<Box<[u8]>, Self> {
+		Rc::try_unwrap(self)
 	}
 }
 
 impl RefCounter for Arc<Box<[u8]>> {
 	#[inline]
-	fn try_unwrap( self ) -> Result<Box<[u8]>, Self> {
-		Arc::try_unwrap( self )
+	fn try_unwrap(self) -> Result<Box<[u8]>, Self> {
+		Arc::try_unwrap(self)
 	}
 }
 
-
 impl<R> SharedGenString<R>
 where R: RefCounter {
-
 	/// Creates a new `SharedString` with the content of `String`.
 	///
 	/// This will convert the String into a Boxed [u8] slice.
 	#[inline]
-	pub fn new( string: String ) -> Self {
+	pub fn new(string: String) -> Self {
 		string.into()
 	}
 
 	#[inline]
-	pub(crate) fn new_raw( pos: (usize, usize), bytes: R ) -> Self {
+	pub(crate) fn new_raw(pos: (usize, usize), bytes: R) -> Self {
 		Self { pos: Some(pos), bytes }
 	}
 
@@ -138,25 +130,25 @@ where R: RefCounter {
 	///
 	/// Behaves the same way as [String::from_utf8](https://doc.rust-lang.org/std/string/struct.String.html#method.from_utf8).
 	///
-	/// If you are sure that the bytes are valid UTF-8, there is an unsafe method
-	/// [from_utf8_unchecked](#method.from_utf8_unchecked) which behaves the same way
-	/// but skips the checks.
+	/// If you are sure that the bytes are valid UTF-8, there is an unsafe
+	/// method [from_utf8_unchecked](#method.from_utf8_unchecked) which behaves
+	/// the same way but skips the checks.
 	///
 	/// ## Errors
 	///
-	/// Returns an `FromUtf8Error` if the bytes are not valid UTF-8 with a description
-	/// were an invalid byte was found.
+	/// Returns an `FromUtf8Error` if the bytes are not valid UTF-8 with a
+	/// description were an invalid byte was found.
 	#[inline]
-	pub fn from_utf8( vec: Vec<u8> ) -> Result<Self, FromUtf8Error> {
-		String::from_utf8( vec ).map( |s| s.into() )
+	pub fn from_utf8(vec: Vec<u8>) -> Result<Self, FromUtf8Error> {
+		String::from_utf8(vec).map(|s| s.into())
 	}
 
-	/// Converts a vector of bytes to a `SharedString` with out checking that every
-	/// bytes is valid UTF-8.
+	/// Converts a vector of bytes to a `SharedString` with out checking that
+	/// every bytes is valid UTF-8.
 	///
 	/// Safe version [from_utf8](#method.from_utf8)
 	#[inline]
-	pub unsafe fn from_utf8_unchecked( vec: Vec<u8> ) -> Self {
+	pub unsafe fn from_utf8_unchecked(vec: Vec<u8>) -> Self {
 		Self {
 			pos: None,
 			bytes: vec.into_boxed_slice().into()
@@ -165,23 +157,24 @@ where R: RefCounter {
 
 	/// Returns a byte slice of the underlying bytes.
 	///
-	/// To get the full bytes from which this `SharedString` was created from use
-	/// [as_bytes_full](#method.as_bytes_full).
+	/// To get the full bytes from which this `SharedString` was created from
+	/// use [as_bytes_full](#method.as_bytes_full).
 	#[inline]
-	pub fn as_bytes( &self ) -> &[u8] {
+	pub fn as_bytes(&self) -> &[u8] {
 		match self.pos {
 			// Safe because we control start and end
 			// and know that it is not out-of-bounds
-			Some(( start, end )) => unsafe {
+			Some((start, end)) => unsafe {
 				self.bytes.get_unchecked(start..=end)
 			},
 			None => &self.bytes
 		}
 	}
 
-	/// Return a byte slice of the bytes from which this `SharedString` was created.
+	/// Return a byte slice of the bytes from which this `SharedString` was
+	/// created.
 	#[inline]
-	pub fn as_full_bytes( &self ) -> &[u8] {
+	pub fn as_full_bytes(&self) -> &[u8] {
 		&self.bytes
 	}
 
@@ -193,14 +186,15 @@ where R: RefCounter {
 	/// # use shared_string::SharedString;
 	/// let s = SharedString::from("foo");
 	///
-	/// assert_eq!( "foo", s.as_str() );
+	/// assert_eq!("foo", s.as_str());
 	/// ```
 	#[inline]
-	pub fn as_str( &self ) -> &str {
+	pub fn as_str(&self) -> &str {
 		&self
 	}
 
-	/// Return a string slice of the bytes from which this `SharedString` was created.
+	/// Return a string slice of the bytes from which this `SharedString` was
+	/// created.
 	///
 	/// ## Example
 	///
@@ -209,12 +203,12 @@ where R: RefCounter {
 	/// let mut foo = SharedString::from("foobar");
 	/// let bar = foo.split_off(3);
 	///
-	/// assert_eq!( "foo", foo.as_str() );
-	/// assert_eq!( "foobar", foo.as_full_str() );
+	/// assert_eq!("foo", foo.as_str());
+	/// assert_eq!("foobar", foo.as_full_str());
 	/// ```
 	#[inline]
-	pub fn as_full_str( &self ) -> &str {
-		unsafe { str::from_utf8_unchecked( &self.bytes ) }
+	pub fn as_full_str(&self) -> &str {
+		unsafe { str::from_utf8_unchecked(&self.bytes) }
 	}
 
 	/// Returns the len of `SharedString`.
@@ -226,53 +220,56 @@ where R: RefCounter {
 	/// let mut foo = SharedString::from("foobar");
 	/// let bar = foo.split_off(3);
 	///
-	/// assert_eq!( 3, foo.len() );
-	/// assert_eq!( 3, bar.len() );
+	/// assert_eq!(3, foo.len());
+	/// assert_eq!(3, bar.len());
 	/// ```
 	#[inline]
-	pub fn len( &self ) -> usize {
+	pub fn len(&self) -> usize {
 		match self.pos {
-			Some(( start, end )) => end - start + 1,
+			Some((start, end)) => end - start + 1,
 			None => self.bytes.len()
 		}
 	}
 
 	/// Returns `true` if the length is zero, and `false` otherwise.
 	#[inline]
-	pub fn is_empty( &self ) -> bool {
+	pub fn is_empty(&self) -> bool {
 		self.len() == 0
 	}
 
 	#[inline]
-	fn pos( &self ) -> (usize, usize) {
+	fn pos(&self) -> (usize, usize) {
 		match self.pos {
 			Some(p) => p,
-			None => ( 0, self.bytes.len().saturating_sub(1) )
+			None => (0, self.bytes.len().saturating_sub(1))
 		}
 	}
 
 	#[inline]
-	fn calc_range<I>( &self, range: I ) -> Option<(usize, usize)>
+	fn calc_range<I>(&self, range: I) -> Option<(usize, usize)>
 	where I: AsRangeInclusive {
 
 		let (start, end) = self.pos();
-		let mut range = range.as_range_inclusive( end - start );
+		let mut range = range.as_range_inclusive(end - start);
 		if range.1 <= range.0 {
-			return None }
+			return None
+		}
 
 		range.0 += start;
 		range.1 += start;
 
 		if range.1 > end {
-			return None }
+			return None
+		}
 
-		Some( range )
+		Some(range)
 	}
 
 	/// Returns a substring of `SharedString`.
 	///
-	/// This is the non-panicking alternative to [idx](#method.idx) and returns `None`
-	/// if the range is out-of-bounds or if the start or the end are not at a char_boundary.
+	/// This is the non-panicking alternative to [idx](#method.idx) and returns
+	/// `None` if the range is out-of-bounds or if the start or the end are not
+	/// at a char_boundary.
 	///
 	/// No allocation is performed.
 	///
@@ -283,25 +280,24 @@ where R: RefCounter {
 	/// # fn inner() -> Option<()> {
 	/// let foobar = SharedString::from("foobar");
 	///
-	/// assert_eq!( "foo", foobar.get(..3)? );
-	/// assert_eq!( "foob", foobar.get(..=3)? );
-	/// assert_eq!( "foobar", foobar.get(..)? );
-	/// assert_eq!( "bar", foobar.get(3..)? );
+	/// assert_eq!("foo", foobar.get(..3)?);
+	/// assert_eq!("foob", foobar.get(..=3)?);
+	/// assert_eq!("foobar", foobar.get(..)?);
+	/// assert_eq!("bar", foobar.get(3..)?);
 	/// # None
 	/// # }
 	/// # inner();
 	/// ```
 	#[inline]
-	pub fn get<I>( &self, range: I ) -> Option<Self>
+	pub fn get<I>(&self, range: I) -> Option<Self>
 	where I: AsRangeInclusive {
-
-		let range = self.calc_range( range )?;
+		let range = self.calc_range(range)?;
 
 		// should validate if is char boundary
 		let s = self.as_full_str();
-		if !s.is_char_boundary( range.0 ) ||
-		   !s.is_char_boundary( range.1 ) {
-			return None
+		if !s.is_char_boundary(range.0)
+			|| !s.is_char_boundary(range.1) {
+			return None;
 		}
 
 		Some(Self {
@@ -310,7 +306,8 @@ where R: RefCounter {
 		})
 	}
 
-	/// Returns a substring of `SharedString` for which no allocation is performed.
+	/// Returns a substring of `SharedString` for which no allocation is
+	/// performed.
 	///
 	/// ## Panics
 	///
@@ -332,17 +329,15 @@ where R: RefCounter {
 	/// # use shared_string::SharedString;
 	/// let foobar = SharedString::from("foobar");
 	///
-	/// assert_eq!( "foo", foobar.idx(..3) );
-	/// assert_eq!( "foob", foobar.idx(..=3) );
-	/// assert_eq!( "foobar", foobar.idx(..) );
-	/// assert_eq!( "bar", foobar.idx(3..) );
+	/// assert_eq!("foo", foobar.idx(..3));
+	/// assert_eq!("foob", foobar.idx(..=3));
+	/// assert_eq!("foobar", foobar.idx(..));
+	/// assert_eq!("bar", foobar.idx(3..));
 	/// ```
 	#[inline]
-	pub fn idx<I>( &self, range: I ) -> Self
+	pub fn idx<I>(&self, range: I) -> Self
 	where I: AsRangeInclusive {
-
-		let range = self.calc_range( range )
-			.expect("range out-of-bounds");
+		let range = self.calc_range(range).expect("range out-of-bounds");
 
 		Self {
 			pos: Some(range),
@@ -355,25 +350,25 @@ where R: RefCounter {
 	/// Tries to avoid a call to `clone` if the underlying data is not used
 	/// by another instance of `SharedString` and start is at zero.
 	#[inline]
-	pub fn into_bytes( self ) -> Vec<u8> {
+	pub fn into_bytes(self) -> Vec<u8> {
 		match (
-			self.bytes.try_unwrap().map( |b| b.into_vec() ),
+			self.bytes.try_unwrap().map(|b| b.into_vec()),
 			self.pos
 		) {
 			// don't copy (allocate)
-			(Ok( mut bytes ), Some(( 0, end ))) => {
-				bytes.truncate( end + 1 );
+			(Ok(mut bytes), Some((0, end))) => {
+				bytes.truncate(end + 1);
 				bytes
-			},
+			}
 			// don't copy (allocate)
-			(Ok( bytes ), _ ) => bytes,
+			(Ok(bytes), _) => bytes,
 
 			// copy (allocate)
-			(Err( slice ), Some(( start, end ))) => unsafe {
-				slice.get_unchecked( start..=end ).to_vec()
+			(Err(slice), Some((start, end))) => unsafe {
+				slice.get_unchecked(start..=end).to_vec()
 			},
 			// copy (allocate)
-			(Err( slice ), None ) => slice.to_vec()
+			(Err(slice), None) => slice.to_vec()
 		}
 	}
 
@@ -382,10 +377,10 @@ where R: RefCounter {
 	/// Tries to avoid a call to `clone` if the underlying data is not used
 	/// by another instance.
 	#[inline]
-	pub fn into_full_bytes( self ) -> Vec<u8> {
+	pub fn into_full_bytes(self) -> Vec<u8> {
 		match self.bytes.try_unwrap() {
-			Ok( bytes ) => bytes.into(),
-			Err( slice ) => slice.to_vec()
+			Ok(bytes) => bytes.into(),
+			Err(slice) => slice.to_vec()
 		}
 	}
 
@@ -394,23 +389,24 @@ where R: RefCounter {
 	/// Tries to avoid a call to `clone` if the underlying data is not used
 	/// by another instance of `SharedString` and start is at zero.
 	#[inline]
-	pub fn into_string( self ) -> String {
+	pub fn into_string(self) -> String {
 		let vec = self.into_bytes();
-		unsafe { String::from_utf8_unchecked( vec ) }
+		unsafe { String::from_utf8_unchecked(vec) }
 	}
 
-	/// Returns the underlying Bytes as a `String` from which this `SharedString`
-	/// was created.
+	/// Returns the underlying Bytes as a `String` from which this
+	/// `SharedString` was created.
 	///
 	/// Tries to avoid a call to `clone` if the underlying data is not used
 	/// by another instance.
 	#[inline]
-	pub fn into_full_string( self ) -> String {
+	pub fn into_full_string(self) -> String {
 		let vec = self.into_full_bytes();
-		unsafe { String::from_utf8_unchecked( vec ) }
+		unsafe { String::from_utf8_unchecked(vec) }
 	}
 
-	/// Pushes a char to the `String` returned by [into_string](#method.into_string).
+	/// Pushes a char to the `String` returned by
+	/// [into_string](#method.into_string).
 	///
 	/// If the conditions in `into_string` are met no `clone` is perfomed.
 	///
@@ -421,16 +417,17 @@ where R: RefCounter {
 	/// let fooba = SharedString::from("fooba");
 	/// let foobar = fooba.push('r');
 	///
-	/// assert_eq!( foobar, "foobar" );
+	/// assert_eq!(foobar, "foobar");
 	/// ```
 	#[inline]
-	pub fn push( self, ch: char ) -> String {
+	pub fn push(self, ch: char) -> String {
 		let mut s = self.into_string();
-		s.push( ch );
+		s.push(ch);
 		s
 	}
 
-	/// Pushes a string slice to the `String` returned by [into_string](#method.into_string).
+	/// Pushes a string slice to the `String` returned by
+	/// [into_string](#method.into_string).
 	///
 	/// If the conditions in `into_string` are met no `clone` is perfomed.
 	///
@@ -441,12 +438,12 @@ where R: RefCounter {
 	/// let foo = SharedString::from("foo");
 	/// let foobar = foo.push_str("bar");
 	///
-	/// assert_eq!( foobar, "foobar" );
+	/// assert_eq!(foobar, "foobar");
 	/// ```
 	#[inline]
-	pub fn push_str( self, string: &str ) -> String {
+	pub fn push_str(self, string: &str) -> String {
 		let mut s = self.into_string();
-		s.push_str( string );
+		s.push_str(string);
 		s
 	}
 
@@ -458,10 +455,9 @@ where R: RefCounter {
 	///
 	/// ## Panics
 	///
-	/// Panics if at is not at a char boundary.
+	/// Panics if `at` is not at a char boundary.
 	#[inline]
-	pub fn split_off( &mut self, mut at: usize ) -> Self {
-
+	pub fn split_off(&mut self, mut at: usize) -> Self {
 		if at == 0 {
 			return self.clone();
 		}
@@ -469,17 +465,16 @@ where R: RefCounter {
 		// maybe can improve this
 		// but maybe everything here gets inlined and
 		// some stuff can be optimized away
-		let s = self.as_str();
-		assert!( s.is_char_boundary(at) );
-		
+		assert!(self.is_char_boundary(at));
+
 		let (start, end) = self.pos();
 		at += start;
 
 		// active string
-		self.pos = Some(( start, at - 1 ));
+		self.pos = Some((start, at - 1));
 
 		Self {
-			pos: Some(( at, end )),
+			pos: Some((at, end)),
 			bytes: self.bytes.clone()
 		}
 	}
@@ -498,19 +493,20 @@ where R: RefCounter {
 	/// let foo = foobar.next().unwrap();
 	/// let bar = foobar.next().unwrap();
 	///
-	/// assert_eq!( foo, "foo" );
-	/// assert_eq!( bar, "bar" );
+	/// assert_eq!(foo, "foo");
+	/// assert_eq!(bar, "bar");
 	/// ```
 	#[inline]
-	pub fn split( self, byte: u8 ) -> Split<R> {
-		Split::new( self.pos(), self.bytes, byte )
+	pub fn split(self, byte: u8) -> Split<R> {
+		Split::new(self.pos(), self.bytes, byte)
 	}
 
 	/// Returns an iterator which returns for every line a `SharedString`.
 	///
 	/// Be aware that this doens't behave exactly like [lines](#method.lines).
 	///
-	/// This implementation returns an empty line at the if there is a `\n` byte.
+	/// This implementation returns an empty line at the if there is a `\n`
+	/// byte.
 	///
 	/// ## Example
 	///
@@ -518,41 +514,40 @@ where R: RefCounter {
 	/// # use shared_string::SharedString;
 	/// let mut lines = SharedString::from("foo\r\nbar\n\nbaz\n").lines();
 	///
-	/// assert_eq!( "foo", lines.next().unwrap() );
-	/// assert_eq!( "bar", lines.next().unwrap() );
-	/// assert_eq!( "", lines.next().unwrap() );
-	/// assert_eq!( "baz", lines.next().unwrap() );
+	/// assert_eq!("foo", lines.next().unwrap());
+	/// assert_eq!("bar", lines.next().unwrap());
+	/// assert_eq!("", lines.next().unwrap());
+	/// assert_eq!("baz", lines.next().unwrap());
 	///
-	/// assert_eq!( None, lines.next() );
+	/// assert_eq!(None, lines.next());
 	/// ```
 	#[inline]
-	pub fn lines( self ) -> Lines<R> {
-		Lines::new( self.pos(), self.bytes )
+	pub fn lines(self) -> Lines<R> {
+		Lines::new(self.pos(), self.bytes)
 	}
-
 }
 
 impl<R> fmt::Display for SharedGenString<R>
 where R: RefCounter {
 	#[inline]
-	fn fmt( &self, f: &mut fmt::Formatter<'_> ) -> fmt::Result {
-		fmt::Display::fmt( self.as_str(), f )
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		fmt::Display::fmt(self.as_str(), f)
 	}
 }
 
 impl<R> fmt::Debug for SharedGenString<R>
 where R: RefCounter {
 	#[inline]
-	fn fmt( &self, f: &mut fmt::Formatter<'_> ) -> fmt::Result {
-		fmt::Debug::fmt( self.as_str(), f )
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		fmt::Debug::fmt(self.as_str(), f)
 	}
 }
 
 impl<R> hash::Hash for SharedGenString<R>
 where R: RefCounter {
 	#[inline]
-	fn hash<H: hash::Hasher>( &self, hasher: &mut H ) {
-		self.as_str().hash( hasher )
+	fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
+		self.as_str().hash(hasher)
 	}
 }
 
@@ -561,16 +556,16 @@ where R: RefCounter {
 	type Target = str;
 
 	#[inline]
-	fn deref( &self ) -> &str {
+	fn deref(&self) -> &str {
 		// Safe because we know that Self contains valid utf8
-		unsafe { str::from_utf8_unchecked( self.as_bytes() ) }
+		unsafe { str::from_utf8_unchecked(self.as_bytes()) }
 	}
 }
 
 impl<R> AsRef<str> for SharedGenString<R>
 where R: RefCounter {
 	#[inline]
-	fn as_ref( &self ) -> &str {
+	fn as_ref(&self) -> &str {
 		self
 	}
 }
@@ -578,28 +573,28 @@ where R: RefCounter {
 impl<R> borrow::Borrow<str> for SharedGenString<R>
 where R: RefCounter {
 	#[inline]
-	fn borrow( &self ) -> &str {
+	fn borrow(&self) -> &str {
 		self
 	}
 }
 
 // need a custom eq
 impl<R, O> cmp::PartialEq<SharedGenString<O>> for SharedGenString<R>
-where R: RefCounter, O: RefCounter {
+where
+	R: RefCounter,
+	O: RefCounter {
 	#[inline]
-	fn eq( &self, other: &SharedGenString<O> ) -> bool {
+	fn eq(&self, other: &SharedGenString<O>) -> bool {
 		self.as_bytes() == other.as_bytes()
 	}
 }
 
-impl<R> cmp::Eq for SharedGenString<R>
-where R: RefCounter {}
-
+impl<R: RefCounter> cmp::Eq for SharedGenString<R> {}
 
 impl<R> cmp::PartialEq<str> for SharedGenString<R>
 where R: RefCounter {
 	#[inline]
-	fn eq( &self, other: &str ) -> bool {
+	fn eq(&self, other: &str) -> bool {
 		self.as_str() == other
 	}
 }
@@ -607,35 +602,35 @@ where R: RefCounter {
 impl<R> cmp::PartialEq<&str> for SharedGenString<R>
 where R: RefCounter {
 	#[inline]
-	fn eq( &self, other: &&str ) -> bool {
+	fn eq(&self, other: &&str) -> bool {
 		self.as_str() == *other
 	}
 }
 
 impl cmp::PartialEq<SharedString> for str {
 	#[inline]
-	fn eq( &self, other: &SharedString ) -> bool {
+	fn eq(&self, other: &SharedString) -> bool {
 		self == other.as_str()
 	}
 }
 
 impl cmp::PartialEq<SharedString> for &str {
 	#[inline]
-	fn eq( &self, other: &SharedString ) -> bool {
+	fn eq(&self, other: &SharedString) -> bool {
 		*self == other.as_str()
 	}
 }
 
 impl cmp::PartialEq<SharedSyncString> for str {
 	#[inline]
-	fn eq( &self, other: &SharedSyncString ) -> bool {
+	fn eq(&self, other: &SharedSyncString) -> bool {
 		self == other.as_str()
 	}
 }
 
 impl cmp::PartialEq<SharedSyncString> for &str {
 	#[inline]
-	fn eq( &self, other: &SharedSyncString ) -> bool {
+	fn eq(&self, other: &SharedSyncString) -> bool {
 		*self == other.as_str()
 	}
 }
@@ -644,212 +639,185 @@ impl cmp::PartialEq<SharedSyncString> for &str {
 
 impl<R> From<String> for SharedGenString<R>
 where R: RefCounter {
-
 	#[inline]
-	fn from( s: String ) -> Self {
+	fn from(s: String) -> Self {
 		Self {
 			pos: None,
-			bytes: s.into_bytes()
-				.into_boxed_slice()
-				.into()
+			bytes: s.into_bytes().into_boxed_slice().into()
 		}
 	}
 }
 
 impl<R> From<&str> for SharedGenString<R>
 where R: RefCounter {
-
 	#[inline]
-	fn from( s: &str ) -> Self {
+	fn from(s: &str) -> Self {
 		s.to_string().into()
 	}
 }
-
-
 
 // Tests
 #[cfg(test)]
 mod tests {
 
-	use super::{ SharedString, SharedSyncString };
+	use super::{SharedString, SharedSyncString};
 
 	#[test]
 	fn rc() {
-
 		let mut hello: SharedString = "Hello, World!".into();
-		assert_eq!( hello.len(), 13 );
+		assert_eq!(hello.len(), 13);
 
-		let world = hello.split_off( 7 );
-		assert_eq!( hello, "Hello, " );
-		assert_eq!( hello.len(), 7 );
-		assert_eq!( world, "World!" );
-		assert_eq!( world.len(), 6 );
-
+		let world = hello.split_off(7);
+		assert_eq!(hello, "Hello, ");
+		assert_eq!(hello.len(), 7);
+		assert_eq!(world, "World!");
+		assert_eq!(world.len(), 6);
 	}
 
 	#[test]
 	fn arc() {
-
 		let mut hello: SharedSyncString = "Hello, World!".into();
 
 		let world = hello.split_off(7);
 
-		std::thread::spawn( move || {
-			assert_eq!( world, "World!" );
-			assert_eq!( world.as_full_str(), "Hello, World!" );
-		} );
+		std::thread::spawn(move || {
+			assert_eq!(world, "World!");
+			assert_eq!(world.as_full_str(), "Hello, World!");
+		});
 
-		assert_eq!( hello, "Hello, " );
-
+		assert_eq!(hello, "Hello, ");
 	}
 
 	#[test]
 	fn into() {
-
 		let hello = SharedString::from("Hello, World!");
 		let s = hello.into_string();
-		assert_eq!( s, "Hello, World!" );
+		assert_eq!(s, "Hello, World!");
 
 		let mut hello: SharedString = s.into();
-		let world = hello.split_off( 7 );
+		let world = hello.split_off(7);
 
 		let s = world.into_string();
-		assert_eq!( s, "World!" );
+		assert_eq!(s, "World!");
 
-		assert!( hello != s.as_str() );
+		assert!(hello != s.as_str());
 
 		let n_hello = SharedString::from("Hello, ");
-		assert_eq!( hello, n_hello );
-
+		assert_eq!(hello, n_hello);
 	}
 
 	#[test]
 	#[should_panic]
 	fn panic_char_boundary() {
-
 		let mut s = SharedString::from("abc 好 def");
-		let _ = s.split_off( 5 );
-
+		let _ = s.split_off(5);
 	}
 
 	#[test]
 	#[should_panic]
 	fn panic_length() {
-
 		let mut s = SharedString::from("abc");
-		let _ = s.split_off( 5 );
-
+		let _ = s.split_off(5);
 	}
 
 	#[test]
 	fn range_as_str() {
-
 		let raw = SharedString::from("Hello, World!");
 		let hello = &raw[..5];
 		let world = &raw[7..];
 
-		assert_eq!( hello, "Hello" );
-		assert_eq!( world, "World!" );
-
+		assert_eq!(hello, "Hello");
+		assert_eq!(world, "World!");
 	}
 
 	#[test]
 	fn range_with_get() {
-
 		let raw = SharedString::from("Hello, World!");
 		let hello = raw.get(..5).unwrap();
 		let world = raw.get(7..).unwrap();
 
-		assert_eq!( hello, "Hello" );
-		assert_eq!( world, "World!" );
-
+		assert_eq!(hello, "Hello");
+		assert_eq!(world, "World!");
 	}
 
 	#[test]
 	fn range_with_idx() {
-
 		let raw = SharedString::from("Hello, World!");
 		let hello = raw.idx(..5);
 		let world = raw.idx(7..);
 
-		assert_eq!( hello, "Hello" );
-		assert_eq!( world, "World!" );
-
+		assert_eq!(hello, "Hello");
+		assert_eq!(world, "World!");
 	}
 
 	#[test]
 	fn empty() {
-
 		let s = SharedString::from("");
-		assert_eq!( s.len(), 0 );
-		assert!( s.is_empty() );
+		assert_eq!(s.len(), 0);
+		assert!(s.is_empty());
 
-		assert!( s.get(..).is_none() );
-		assert!( s.get(1..).is_none() );
-
+		assert!(s.get(..).is_none());
+		assert!(s.get(1..).is_none());
 	}
 
 	#[test]
 	fn equal() {
-
 		let rc: SharedString = "Hello, World!".into();
 		let arc: SharedSyncString = "Hello, World!".into();
-		assert_eq!( rc, arc );
-
+		assert_eq!(rc, arc);
 	}
 
 	#[test]
 	fn split() {
-
 		let fullname = SharedString::from("Albert Einstein");
 		let mut split = fullname.split(b' ');
-		assert_eq!( split.next().unwrap(), "Albert" );
-		assert_eq!( split.next().unwrap(), "Einstein" );
-		assert_eq!( split.next(), None );
-
+		assert_eq!(split.next().unwrap(), "Albert");
+		assert_eq!(split.next().unwrap(), "Einstein");
+		assert_eq!(split.next(), None);
 	}
 
 	#[test]
 	fn lines() {
-
 		let quote = SharedString::from("Wenn die Menschen nur über das sprächen,\nwas sie begreifen,\r\ndann würde es sehr still auf der Welt sein.\n\r\n");
 		let mut lines = quote.lines();
-		assert_eq!( lines.next().unwrap(), "Wenn die Menschen nur über das sprächen," );
-		assert_eq!( lines.next().unwrap(), "was sie begreifen," );
-		assert_eq!( lines.next().unwrap(), "dann würde es sehr still auf der Welt sein." );
-		assert_eq!( lines.next().unwrap(), "" );
-		assert_eq!( lines.next(), None );
+		assert_eq!(
+			lines.next().unwrap(),
+			"Wenn die Menschen nur über das sprächen,"
+		);
+		assert_eq!(lines.next().unwrap(), "was sie begreifen,");
+		assert_eq!(
+			lines.next().unwrap(),
+			"dann würde es sehr still auf der Welt sein."
+		);
+		assert_eq!(lines.next().unwrap(), "");
+		assert_eq!(lines.next(), None);
 
 		let empty = SharedString::from(" ");
 		let mut lines = empty.lines();
-		assert_eq!( " ", lines.next().unwrap() );
-		assert_eq!( lines.next(), None );
-
+		assert_eq!(" ", lines.next().unwrap());
+		assert_eq!(lines.next(), None);
 	}
 
 	#[test]
 	fn range_eq_str_range() {
-
 		let line = "foo: bar";
 		let at = line.find(':').unwrap();
 		let key = &line[..at];
 		let value = &line[(at + 2)..];
 
-		assert_eq!( key, "foo" );
-		assert_eq!( value, "bar" );
+		assert_eq!(key, "foo");
+		assert_eq!(value, "bar");
 
 		let line = SharedString::from(line);
 		let key = line.idx(..at);
 		let value = line.idx((at + 2)..);
 
-		assert_eq!( key, "foo" );
-		assert_eq!( value, "bar" );
-
+		assert_eq!(key, "foo");
+		assert_eq!(value, "bar");
 	}
 
 	#[test]
 	fn range_in_range() {
-
 		let line = "date: Mon, 30 Nov 2020 22:16:22 GMT\nserver: mw1271.eqiad.wmnet\nx-content-type-options: nosniff";
 		let mut lines = SharedString::from(line).lines();
 
@@ -857,14 +825,12 @@ mod tests {
 		let line = lines.next().unwrap();
 
 		let at = line.find(':').unwrap();
-		assert_eq!( at, 6 );
+		assert_eq!(at, 6);
 
 		let key = line.idx(..at);
-		assert_eq!( key, "server" );
+		assert_eq!(key, "server");
 
-		let value = line.idx( (at + 2).. );
-		assert_eq!( value, "mw1271.eqiad.wmnet" );
-
+		let value = line.idx((at + 2)..);
+		assert_eq!(value, "mw1271.eqiad.wmnet");
 	}
-
 }
