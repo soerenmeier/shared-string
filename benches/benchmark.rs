@@ -1,12 +1,11 @@
 
 use std::collections::HashMap;
-use std::io::{ Read, BufReader, BufRead };
+use std::io::{Read, BufReader, BufRead};
 use std::mem;
 
-use shared_string::{ SharedString, SharedSyncString };
+use shared_string::{SharedString, SharedSyncString};
 
-use criterion::{ black_box, criterion_group, criterion_main, Criterion };
-
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 // taken from a response from wikipedia.org
 const HTTP_HEADER: &'static str = "\
@@ -30,10 +29,9 @@ cache-control: private, s-maxage=0, max-age=0, must-revalidate
 X-Firefox-Spdy: h2\
 ";
 
-
 // String
 
-fn parse_to_string( string: String ) -> HashMap<String, String> {
+fn parse_to_string(string: String) -> HashMap<String, String> {
 	let mut map = HashMap::new();
 	for line in string.lines() {
 		// unwrap because we know that in every line is a colon
@@ -43,13 +41,13 @@ fn parse_to_string( string: String ) -> HashMap<String, String> {
 		// we can skip the space here because we know after every colon is a space
 		let value = line[(at + 2)..].to_string();
 
-		map.insert( key, value );
+		map.insert(key, value);
 	}
 
 	map
 }
 
-fn parse_to_shared_string( string: String ) -> HashMap<SharedString, SharedString> {
+fn parse_to_shared_string(string: String) -> HashMap<SharedString, SharedString> {
 	let string = SharedString::from(string);
 	let mut map = HashMap::new();
 	for line in string.lines() {
@@ -60,13 +58,13 @@ fn parse_to_shared_string( string: String ) -> HashMap<SharedString, SharedStrin
 		// we can skip the space here because we know after every colon is a space
 		let value = line.idx((at + 2)..);
 
-		map.insert( key, value );
+		map.insert(key, value);
 	}
 
 	map
 }
 
-fn parse_to_shared_sync_string( string: String ) -> HashMap<SharedSyncString, SharedSyncString> {
+fn parse_to_shared_sync_string(string: String) -> HashMap<SharedSyncString, SharedSyncString> {
 	let string = SharedSyncString::from(string);
 	let mut map = HashMap::new();
 	for line in string.lines() {
@@ -77,41 +75,46 @@ fn parse_to_shared_sync_string( string: String ) -> HashMap<SharedSyncString, Sh
 		// we can skip the space here because we know after every colon is a space
 		let value = line.idx((at + 2)..);
 
-		map.insert( key, value );
+		map.insert(key, value);
 	}
 
 	map
 }
 
-fn benchmark_string( c: &mut Criterion ) {
+fn benchmark_string(c: &mut Criterion) {
 
-	c.bench_function("parse_to_string", |b| b.iter( || {
-		let http_header = HTTP_HEADER.to_string();
-		parse_to_string(black_box( http_header ))
-	} ) );
+	c.bench_function("parse_to_string", |b| {
+		b.iter(|| {
+			let http_header = HTTP_HEADER.to_string();
+			parse_to_string(black_box(http_header))
+		})
+	});
 
-	c.bench_function("parse_to_shared_string", |b| b.iter( || {
-		let http_header = HTTP_HEADER.to_string();
-		parse_to_shared_string(black_box( http_header ))
-	} ) );
+	c.bench_function("parse_to_shared_string", |b| {
+		b.iter(|| {
+			let http_header = HTTP_HEADER.to_string();
+			parse_to_shared_string(black_box(http_header))
+		})
+	});
 
-	c.bench_function("parse_to_shared_sync_string", |b| b.iter( || {
-		let http_header = HTTP_HEADER.to_string();
-		parse_to_shared_sync_string(black_box( http_header ))
-	} ) );
-
+	c.bench_function("parse_to_shared_sync_string", |b| {
+		b.iter(|| {
+			let http_header = HTTP_HEADER.to_string();
+			parse_to_shared_sync_string(black_box(http_header))
+		})
+	});
 }
 
 // BufReader
 
-fn parse_to_string_from_buf_reader<T: Read>( mut reader: BufReader<T> ) -> HashMap<String, String> {
+fn parse_to_string_from_buf_reader<T: Read>(mut reader: BufReader<T>) -> HashMap<String, String> {
 	let mut map = HashMap::new();
 	let mut line = String::with_capacity(100);
 
 	// this is faster than parse_to_string
 	// because read_line does not check for \r\n
 	// and doesn't strip them
-	while 0 != reader.read_line( &mut line ).unwrap() {
+	while 0 != reader.read_line(&mut line).unwrap() {
 		// unwrap because we know that in every line is a colon
 		let at = line.find(':').unwrap();
 
@@ -119,17 +122,19 @@ fn parse_to_string_from_buf_reader<T: Read>( mut reader: BufReader<T> ) -> HashM
 		// we can skip the space here because we know after every colon is a space
 		let value = line[(at + 2)..].to_string();
 
-		map.insert( key, value );
+		map.insert(key, value);
 	}
 
 	map
 }
 
-fn parse_to_shared_string_from_buf_reader<T: Read>( mut reader: BufReader<T> ) -> HashMap<SharedString, SharedString> {
+fn parse_to_shared_string_from_buf_reader<T: Read>(
+	mut reader: BufReader<T>
+) -> HashMap<SharedString, SharedString> {
 	let mut map = HashMap::new();
 	let mut line = String::with_capacity(100);
 
-	while 0 != reader.read_line( &mut line ).unwrap() {
+	while 0 != reader.read_line(&mut line).unwrap() {
 		let line: SharedString = line.clone().into();
 		// unwrap because we know that in every line is a colon
 		let at = line.find(':').unwrap();
@@ -138,17 +143,19 @@ fn parse_to_shared_string_from_buf_reader<T: Read>( mut reader: BufReader<T> ) -
 		// we can skip the space here because we know after every colon is a space
 		let value = line.idx((at + 2)..);
 
-		map.insert( key, value );
+		map.insert(key, value);
 	}
 
 	map
 }
 
-fn parse_to_shared_string_from_buf_reader_with_split_off<T: Read>( mut reader: BufReader<T> ) -> HashMap<SharedString, SharedString> {
+fn parse_to_shared_string_from_buf_reader_with_split_off<T: Read>(
+	mut reader: BufReader<T>
+) -> HashMap<SharedString, SharedString> {
 	let mut map = HashMap::new();
 	let mut line = String::with_capacity(100);
 
-	while 0 != reader.read_line( &mut line ).unwrap() {
+	while 0 != reader.read_line(&mut line).unwrap() {
 		let mut key: SharedString = line.clone().into();
 		// unwrap because we know that in every line is a colon
 		let at = key.find(':').unwrap();
@@ -157,17 +164,19 @@ fn parse_to_shared_string_from_buf_reader_with_split_off<T: Read>( mut reader: B
 		// we can skip the space here because we know after every colon is a space
 		let value = value.idx(2..);
 
-		map.insert( key, value );
+		map.insert(key, value);
 	}
 
 	map
 }
 
-fn parse_to_shared_sync_string_from_buf_reader<T: Read>( mut reader: BufReader<T> ) -> HashMap<SharedSyncString, SharedSyncString> {
+fn parse_to_shared_sync_string_from_buf_reader<T: Read>(
+	mut reader: BufReader<T>
+) -> HashMap<SharedSyncString, SharedSyncString> {
 	let mut map = HashMap::new();
 	let mut line = String::with_capacity(100);
 
-	while 0 != reader.read_line( &mut line ).unwrap() {
+	while 0 != reader.read_line(&mut line).unwrap() {
 		let line: SharedSyncString = line.clone().into();
 		// unwrap because we know that in every line is a colon
 		let at = line.find(':').unwrap();
@@ -176,39 +185,48 @@ fn parse_to_shared_sync_string_from_buf_reader<T: Read>( mut reader: BufReader<T
 		// we can skip the space here because we know after every colon is a space
 		let value = line.idx((at + 2)..);
 
-		map.insert( key, value );
+		map.insert(key, value);
 	}
 
 	map
 }
 
-fn benchmark_buf_reader( c: &mut Criterion ) {
-
+fn benchmark_buf_reader(c: &mut Criterion) {
 	let bytes = HTTP_HEADER.as_bytes().to_vec();
 
-	c.bench_function("parse_to_string_from_buf_reader", |b| b.iter( || {
-		let reader = BufReader::new( bytes.as_slice() );
-		parse_to_string_from_buf_reader(black_box( reader ))
-	} ) );
+	c.bench_function("parse_to_string_from_buf_reader", |b| {
+		b.iter(|| {
+			let reader = BufReader::new(bytes.as_slice());
+			parse_to_string_from_buf_reader(black_box(reader))
+		})
+	});
 
-	c.bench_function("parse_to_shared_string_from_buf_reader", |b| b.iter( || {
-		let reader = BufReader::new( bytes.as_slice() );
-		parse_to_shared_string_from_buf_reader(black_box( reader ))
-	} ) );
+	c.bench_function("parse_to_shared_string_from_buf_reader", |b| {
+		b.iter(|| {
+			let reader = BufReader::new(bytes.as_slice());
+			parse_to_shared_string_from_buf_reader(black_box(reader))
+		})
+	});
 
-	c.bench_function("parse_to_shared_string_from_buf_reader_with_split_off", |b| b.iter( || {
-		let reader = BufReader::new( bytes.as_slice() );
-		parse_to_shared_string_from_buf_reader_with_split_off(black_box( reader ))
-	} ) );
+	c.bench_function(
+		"parse_to_shared_string_from_buf_reader_with_split_off",
+		|b| {
+			b.iter(|| {
+				let reader = BufReader::new(bytes.as_slice());
+				parse_to_shared_string_from_buf_reader_with_split_off(black_box(reader))
+			})
+		}
+	);
 
-	c.bench_function("parse_to_shared_sync_string_from_buf_reader", |b| b.iter( || {
-		let reader = BufReader::new( bytes.as_slice() );
-		parse_to_shared_sync_string_from_buf_reader(black_box( reader ))
-	} ) );
-
+	c.bench_function("parse_to_shared_sync_string_from_buf_reader", |b| {
+		b.iter(|| {
+			let reader = BufReader::new(bytes.as_slice());
+			parse_to_shared_sync_string_from_buf_reader(black_box(reader))
+		})
+	});
 }
 
-criterion_group!( bench_string, benchmark_string );
-criterion_group!( bench_buf_reader, benchmark_buf_reader );
+criterion_group!(bench_string, benchmark_string);
+criterion_group!(bench_buf_reader, benchmark_buf_reader);
 
-criterion_main!( bench_string, bench_buf_reader );
+criterion_main!(bench_string, bench_buf_reader);
