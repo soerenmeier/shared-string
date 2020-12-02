@@ -41,8 +41,8 @@
 //! more. See `benches/benchmark.rs` for benchmarks.
 
 #[doc(hidden)]
-pub mod as_range_inclusive;
-use as_range_inclusive::AsRangeInclusive;
+pub mod as_range;
+use as_range::AsRange;
 
 pub mod iter;
 use iter::{Split, Lines};
@@ -76,7 +76,8 @@ use std::string::FromUtf8Error;
 pub struct SharedGenString<R>
 where R: RefCounter {
 	// start & end | start..=end
-	pos: Option<(usize, usize)>,
+	start: usize,
+	len: usize,
 
 	// can only be generated from valid utf8
 	bytes: R
@@ -122,8 +123,8 @@ where R: RefCounter {
 	}
 
 	#[inline]
-	pub(crate) fn new_raw(pos: (usize, usize), bytes: R) -> Self {
-		Self { pos: Some(pos), bytes }
+	pub(crate) fn new_raw(start: usize, len: usize, bytes: R) -> Self {
+		Self { start, len, bytes }
 	}
 
 	/// Convert a vector of bytes to a `SharedString`.
@@ -150,7 +151,8 @@ where R: RefCounter {
 	#[inline]
 	pub unsafe fn from_utf8_unchecked(vec: Vec<u8>) -> Self {
 		Self {
-			pos: None,
+			start: 0,
+			len: vec.len(),
 			bytes: vec.into_boxed_slice().into()
 		}
 	}
@@ -161,13 +163,11 @@ where R: RefCounter {
 	/// use [as_bytes_full](#method.as_bytes_full).
 	#[inline]
 	pub fn as_bytes(&self) -> &[u8] {
-		match self.pos {
+		let end = self.start + self.len;
+		unsafe {
 			// Safe because we control start and end
 			// and know that it is not out-of-bounds
-			Some((start, end)) => unsafe {
-				self.bytes.get_unchecked(start..=end)
-			},
-			None => &self.bytes
+			self.bytes.get_unchecked(self.start..end)
 		}
 	}
 
@@ -225,44 +225,35 @@ where R: RefCounter {
 	/// ```
 	#[inline]
 	pub fn len(&self) -> usize {
-		match self.pos {
-			Some((start, end)) => end - start + 1,
-			None => self.bytes.len()
-		}
+		self.len
 	}
 
 	/// Returns `true` if the length is zero, and `false` otherwise.
 	#[inline]
 	pub fn is_empty(&self) -> bool {
-		self.len() == 0
+		self.len == 0
 	}
 
+	// returns new start and length if it is a valid range
 	#[inline]
-	fn pos(&self) -> (usize, usize) {
-		match self.pos {
-			Some(p) => p,
-			None => (0, self.bytes.len().saturating_sub(1))
-		}
-	}
+	fn validate_range<I>(&self, range: I) -> Option<(usize, usize)>
+	where I: AsRange {
 
-	#[inline]
-	fn calc_range<I>(&self, range: I) -> Option<(usize, usize)>
-	where I: AsRangeInclusive {
-
-		let (start, end) = self.pos();
-		let mut range = range.as_range_inclusive(end - start);
-		if range.1 <= range.0 {
+		let (mut n_start, n_end) = range.as_range(self.len);
+		// if it is a reverse range or a range with len 0
+		if n_start >= n_end {
 			return None
 		}
 
-		range.0 += start;
-		range.1 += start;
+		let n_len = n_end - n_start;
+		n_start += self.start; // add offset
 
-		if range.1 > end {
-			return None
+		// check that new range is not out-of-bounds
+		if n_start + n_len > self.bytes.len() {
+			None
+		} else {
+			Some((n_start, n_len))
 		}
-
-		Some(range)
 	}
 
 	/// Returns a substring of `SharedString`.
@@ -290,18 +281,19 @@ where R: RefCounter {
 	/// ```
 	#[inline]
 	pub fn get<I>(&self, range: I) -> Option<Self>
-	where I: AsRangeInclusive {
-		let range = self.calc_range(range)?;
+	where I: AsRange {
+		let (n_start, n_len) = self.validate_range(range)?;
 
 		// should validate if is char boundary
 		let s = self.as_full_str();
-		if !s.is_char_boundary(range.0)
-			|| !s.is_char_boundary(range.1) {
+		if !s.is_char_boundary(n_start)
+			|| !s.is_char_boundary(n_start + n_len) {
 			return None;
 		}
 
 		Some(Self {
-			pos: Some(range),
+			start: n_start,
+			len: n_len,
 			bytes: self.bytes.clone()
 		})
 	}
@@ -334,41 +326,47 @@ where R: RefCounter {
 	/// assert_eq!("foobar", foobar.idx(..));
 	/// assert_eq!("bar", foobar.idx(3..));
 	/// ```
+	///
+	/// ## Todo
+	///
+	/// Replace trait `AsRange` with
+	/// [RangeBounds](https://doc.rust-lang.org/std/ops/trait.RangeBounds.html)
 	#[inline]
 	pub fn idx<I>(&self, range: I) -> Self
-	where I: AsRangeInclusive {
-		let range = self.calc_range(range).expect("range out-of-bounds");
+	where I: AsRange {
+		let (n_start, n_len) = self.validate_range(range).unwrap();
 
 		Self {
-			pos: Some(range),
+			start: n_start,
+			len: n_len,
 			bytes: self.bytes.clone()
 		}
 	}
 
 	/// Convert `SharedString` to a `Vec<u8>`.
 	///
-	/// Tries to avoid a call to `clone` if the underlying data is not used
-	/// by another instance of `SharedString` and start is at zero.
+	/// Avoids an allocation if the underlying data is not used by another
+	/// instance of `SharedString` and start is at zero.
 	#[inline]
 	pub fn into_bytes(self) -> Vec<u8> {
-		match (
-			self.bytes.try_unwrap().map(|b| b.into_vec()),
-			self.pos
-		) {
-			// don't copy (allocate)
-			(Ok(mut bytes), Some((0, end))) => {
-				bytes.truncate(end + 1);
+		match self.bytes.try_unwrap().map(|b| b.into_vec()) {
+			// don't allocate
+			Ok(mut bytes) if self.start == 0 => {
+				bytes.truncate(self.len);
 				bytes
-			}
-			// don't copy (allocate)
-			(Ok(bytes), _) => bytes,
-
-			// copy (allocate)
-			(Err(slice), Some((start, end))) => unsafe {
-				slice.get_unchecked(start..=end).to_vec()
 			},
-			// copy (allocate)
-			(Err(slice), None) => slice.to_vec()
+			// needs an allocation
+			// Safe because only we control self.start and self.end
+			Ok(bytes) => unsafe {
+				let range = self.start..(self.start + self.len);
+				bytes.get_unchecked(range).to_vec()
+			},
+			// needs an allocation
+			// Safe because only we control self.start and self.end
+			Err(slice) => unsafe {
+				let range = self.start..(self.start + self.len);
+				slice.get_unchecked(range).to_vec()
+			}
 		}
 	}
 
@@ -391,6 +389,7 @@ where R: RefCounter {
 	#[inline]
 	pub fn into_string(self) -> String {
 		let vec = self.into_bytes();
+		// Safe because we know the bytes are valid UTF-8
 		unsafe { String::from_utf8_unchecked(vec) }
 	}
 
@@ -457,24 +456,20 @@ where R: RefCounter {
 	///
 	/// Panics if `at` is not at a char boundary.
 	#[inline]
-	pub fn split_off(&mut self, mut at: usize) -> Self {
+	pub fn split_off(&mut self, at: usize) -> Self {
 		if at == 0 {
-			return self.clone();
+			return self.clone()
 		}
 
-		// maybe can improve this
-		// but maybe everything here gets inlined and
-		// some stuff can be optimized away
+		// panics if at > self.len
 		assert!(self.is_char_boundary(at));
 
-		let (start, end) = self.pos();
-		at += start;
-
-		// active string
-		self.pos = Some((start, at - 1));
+		let n_len = self.len - at;
+		self.len = at;
 
 		Self {
-			pos: Some((at, end)),
+			start: self.start + at,
+			len: n_len,
 			bytes: self.bytes.clone()
 		}
 	}
@@ -498,7 +493,7 @@ where R: RefCounter {
 	/// ```
 	#[inline]
 	pub fn split(self, byte: u8) -> Split<R> {
-		Split::new(self.pos(), self.bytes, byte)
+		Split::new(self.start, self.len, self.bytes, byte)
 	}
 
 	/// Returns an iterator which returns for every line a `SharedString`.
@@ -523,7 +518,8 @@ where R: RefCounter {
 	/// ```
 	#[inline]
 	pub fn lines(self) -> Lines<R> {
-		Lines::new(self.pos(), self.bytes)
+		Lines::new(self.start, self.len, self.bytes)
+	}
 	}
 }
 
@@ -642,7 +638,8 @@ where R: RefCounter {
 	#[inline]
 	fn from(s: String) -> Self {
 		Self {
-			pos: None,
+			start: 0,
+			len: s.len(),
 			bytes: s.into_bytes().into_boxed_slice().into()
 		}
 	}
