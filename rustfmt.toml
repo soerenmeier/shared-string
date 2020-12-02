@@ -1,0 +1,32 @@
+edition = "2018"
+hard_tabs = true
+match_arm_leading_pipes = "Preserve"
+reorder_imports = false
+reorder_modules = false
+use_field_init_shorthand = true
+use_try_shorthand = true
+
+# unstable
+unstable_features = true
+brace_style = "PreferSameLine"
+error_on_line_overflow = true
+format_code_in_doc_comments = true
+format_macro_matchers = true
+imports_layout = "HorizontalVertical"
+merge_imports = true
+normalize_comments = true
+normalize_doc_attributes = true
+# preserve_block_start_blank_lines = true
+# preserve_closure_block_wrapping = true
+overflow_delimited_expr = true
+reorder_impl_items = true
+# struct_lit_single_line = false
+trailing_comma = "Never"
+# trailing_semicolon = false
+where_single_line = true
+wrap_comments = true
+
+# modules grouping
+# 1 first super, crate, self
+# 2 std, core
+# 3.. grouped by extern crates as seen fit
