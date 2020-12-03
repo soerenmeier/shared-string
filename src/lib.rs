@@ -321,7 +321,7 @@ where R: RefCounter {
 	///
 	/// The [Index](https://doc.rust-lang.org/std/ops/trait.Index.html) Trait
 	/// is not implemented because `index` always returns a reference
-	/// and here you always received an owned type.
+	/// and here you always receive an owned type.
 	///
 	/// ## Example
 	///
