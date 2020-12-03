@@ -17,5 +17,9 @@ categories = ["data-structures", "parsing"]
 criterion = "0.3"
 
 [[bench]]
-name = "benchmark"
+name = "parsing_key_value_lines"
+harness = false
+
+[[bench]]
+name = "main_example"
 harness = false
