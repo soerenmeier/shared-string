@@ -83,7 +83,7 @@ use std::string::FromUtf8Error;
 #[derive(Clone)]
 pub struct SharedGenString<R>
 where R: RefCounter {
-	// start & end | start..=end
+	// maybe replace start with a pointer??
 	start: usize,
 	len: usize,
 
@@ -466,7 +466,9 @@ where R: RefCounter {
 	#[inline]
 	pub fn split_off(&mut self, at: usize) -> Self {
 		if at == 0 {
-			return self.clone()
+			let c = self.clone();
+			self.len = 0;
+			return c
 		}
 
 		// panics if at > self.len
@@ -723,6 +725,14 @@ mod tests {
 
 		let n_hello = SharedString::from("Hello, ");
 		assert_eq!(hello, n_hello);
+	}
+
+	#[test]
+	fn split_off_zero() {
+		let mut foobar = SharedString::from("foobar");
+		let n_foobar = foobar.split_off(0);
+		assert_eq!("", foobar);
+		assert_eq!("foobar", n_foobar);
 	}
 
 	#[test]
