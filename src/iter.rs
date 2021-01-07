@@ -1,122 +1,105 @@
 
 //! Iterator types
 
-use crate::{SharedGenString, RefCounter};
+use crate::SharedString;
+
+use std::mem;
+
+use bytes::{Bytes, Buf};
 
 /// A Split iterator returned by
-/// [split](../struct.SharedGenString.html#method.split).
+/// [split](../struct.SharedString.html#method.split).
 #[derive(Debug, Clone)]
-pub struct Split<R> {
-	start: usize,
-	len: usize,
-	bytes: R,
+pub struct Split {
+	bytes: Bytes,
 	byte: u8
 }
 
-impl<R> Split<R>
-where R: RefCounter {
-	pub(crate) fn new(start: usize, len: usize, bytes: R, byte: u8) -> Self {
-		Self { start, len, bytes, byte }
-	}
-
-	#[inline]
-	fn remaning_slice(&self) -> &[u8] {
-		// Safe because only we control start and len
-		let range = self.start..(self.start + self.len);
-		unsafe { self.bytes.get_unchecked(range) }
+impl Split {
+	pub(crate) fn new(bytes: Bytes, byte: u8) -> Self {
+		Self { bytes, byte }
 	}
 
 	// returns index of new byte or self.len
 	#[inline]
-	fn find_next(&self) -> usize {
-		self.remaning_slice()
+	fn find_next(&self) -> Option<usize> {
+		self.bytes
 			.iter()
 			.position(|b| b == &self.byte)
-			.unwrap_or(self.len)
 	}
 }
 
-impl<R> Iterator for Split<R>
-where R: RefCounter {
-	type Item = SharedGenString<R>;
+impl Iterator for Split {
+	type Item = SharedString;
 
 	fn next(&mut self) -> Option<Self::Item> {
-		if self.len == 0 {
+		if self.bytes.is_empty() {
 			return None
 		}
 
-		let at = self.find_next();
-		let n_at = at + 1; // might out-of-bound
+		let n_bytes = match self.find_next() {
+			Some(p) => {
+				let bytes = self.bytes.split_to(p);
+				self.bytes.advance(1);
+				bytes
+			},
+			None => mem::take(&mut self.bytes)
+		};
 
-		let n_start = self.start;
-		self.start += n_at;
-		self.len = self.len.saturating_sub(n_at);
-		Some(SharedGenString::new_raw(
-			n_start,
-			at,
-			self.bytes.clone()
-		))
+		// safe because new can only get called from
+		// SharedString
+		Some(unsafe {
+			SharedString::from_bytes_unchecked(n_bytes)
+		})
 	}
 }
 
 /// A Lines iterator returned by
-/// [lines](../struct.SharedGenString.html#method.lines).
+/// [lines](../struct.SharedString.html#method.lines).
 #[derive(Debug, Clone)]
-pub struct Lines<R> {
-	start: usize,
-	len: usize,
-	bytes: R
+pub struct Lines {
+	bytes: Bytes
 }
 
-impl<R> Lines<R>
-where R: RefCounter {
-	pub(crate) fn new(start: usize, len: usize, bytes: R) -> Self {
-		Self { start, len, bytes }
-	}
-
-	#[inline]
-	fn remaning_slice(&self) -> &[u8] {
-		// Safe because only we control start and len
-		let range = self.start..(self.start + self.len);
-		unsafe { self.bytes.get_unchecked(range) }
+impl Lines {
+	pub(crate) fn new(bytes: Bytes) -> Self {
+		Self { bytes }
 	}
 
 	// returns index of new byte or self.len
 	#[inline]
-	fn find_next(&self) -> usize {
-		self.remaning_slice()
+	fn find_next(&self) -> Option<usize> {
+		self.bytes
 			.iter()
 			.position(|&b| b == b'\n')
-			.unwrap_or(self.len)
 	}
 }
 
-impl<R> Iterator for Lines<R>
-where R: RefCounter {
-	type Item = SharedGenString<R>;
+impl Iterator for Lines {
+	type Item = SharedString;
 
 	fn next(&mut self) -> Option<Self::Item> {
-		if self.len == 0 {
+
+		if self.bytes.is_empty() {
 			return None
 		}
 
-		let mut at = self.find_next();
-		// + 1 for skipping \n
-		let newline_at = at + 1; // could be out-of-bound
+		let n_bytes = match self.find_next() {
+			Some(p) => {
+				let mut bytes = self.bytes.split_to(p);
+				self.bytes.advance(1);
+				if bytes.ends_with(&[b'\r']) {
+					bytes.truncate(bytes.len() - 1);
+				}
+				bytes
+			},
+			None => mem::take(&mut self.bytes)
+		};
 
-		let n_start = self.start;
-		self.start += newline_at;
-		self.len = self.len.saturating_sub(newline_at);
-
-		// check if should do at - 1 (to remove \r)
-		if at >= 1 && self.bytes[n_start + at - 1] == b'\r' {
-			at -= 1;
-		}
-
-		Some(SharedGenString::new_raw(
-			n_start,
-			at,
-			self.bytes.clone()
-		))
+		// safe because new can only get called from
+		// SharedString
+		Some(unsafe {
+			SharedString::from_bytes_unchecked(n_bytes)
+		})
 	}
 }
