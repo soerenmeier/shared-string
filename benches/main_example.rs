@@ -35,7 +35,7 @@ struct NameShared {
 
 impl NameShared {
 	pub fn new(fullname: &str) -> Option<Self> {
-		let mut split = SharedString::from(fullname).lines();
+		let mut split = SharedString::from(String::from(fullname)).lines();
 		Some(Self {
 			firstname: split.next()?,
 			middlename: split.next()?,

@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::io::{Read, BufReader, BufRead};
 
-use shared_string::{SharedString, SharedSyncString};
+use shared_string::SharedString;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
@@ -68,24 +68,6 @@ fn parse_to_shared_string(string: String) -> HashMap<SharedString, SharedString>
 	map
 }
 
-// time: ~2.42us
-fn parse_to_shared_sync_string(string: String) -> HashMap<SharedSyncString, SharedSyncString> {
-	let string = SharedSyncString::from(string);
-	let mut map = HashMap::new();
-	for line in string.lines() {
-		// unwrap because we know that in every line is a colon
-		let at = line.find(':').unwrap();
-
-		let key = line.idx(..at);
-		// we can skip the space here because we know after every colon is a space
-		let value = line.idx((at + 2)..);
-
-		map.insert(key, value);
-	}
-
-	map
-}
-
 fn benchmark_string(c: &mut Criterion) {
 
 	c.bench_function("parse_to_string", |b| {
@@ -99,13 +81,6 @@ fn benchmark_string(c: &mut Criterion) {
 		b.iter(|| {
 			let http_header = HTTP_HEADER.to_string();
 			parse_to_shared_string(black_box(http_header))
-		})
-	});
-
-	c.bench_function("parse_to_shared_sync_string", |b| {
-		b.iter(|| {
-			let http_header = HTTP_HEADER.to_string();
-			parse_to_shared_sync_string(black_box(http_header))
 		})
 	});
 }
@@ -178,28 +153,6 @@ fn parse_to_shared_string_from_buf_reader_with_split_off<T: Read>(
 	map
 }
 
-// time: ~2.38us
-fn parse_to_shared_sync_string_from_buf_reader<T: Read>(
-	mut reader: BufReader<T>
-) -> HashMap<SharedSyncString, SharedSyncString> {
-	let mut map = HashMap::new();
-	let mut line = String::with_capacity(100);
-
-	while 0 != reader.read_line(&mut line).unwrap() {
-		let line: SharedSyncString = line.clone().into();
-		// unwrap because we know that in every line is a colon
-		let at = line.find(':').unwrap();
-
-		let key = line.idx(..at);
-		// we can skip the space here because we know after every colon is a space
-		let value = line.idx((at + 2)..);
-
-		map.insert(key, value);
-	}
-
-	map
-}
-
 fn benchmark_buf_reader(c: &mut Criterion) {
 	let bytes = HTTP_HEADER.as_bytes().to_vec();
 
@@ -226,13 +179,6 @@ fn benchmark_buf_reader(c: &mut Criterion) {
 			})
 		}
 	);
-
-	c.bench_function("parse_to_shared_sync_string_from_buf_reader", |b| {
-		b.iter(|| {
-			let reader = BufReader::new(bytes.as_slice());
-			parse_to_shared_sync_string_from_buf_reader(black_box(reader))
-		})
-	});
 }
 
 // BufReader with a new string for every line
