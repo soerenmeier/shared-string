@@ -48,14 +48,11 @@
 //! `SharedString` can increase the perfomance in situations such as the example
 //! above by over 30%. See `benches/*` for benchmarks.
 
-#[doc(hidden)]
-pub mod as_range;
-use as_range::AsRange;
-
 pub mod iter;
 use iter::{Split, Lines};
 
 use std::{ops, str, cmp, fmt, hash, borrow};
+use ops::Bound;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::string::FromUtf8Error;
@@ -122,12 +119,11 @@ impl RefCounter for Arc<Box<[u8]>> {
 
 impl<R> SharedGenString<R>
 where R: RefCounter {
-	/// Creates a new `SharedString` with the content of `String`.
-	///
-	/// This will convert the String into a Boxed [u8] slice.
+
+	/// Creates a new empty `SharedString`.
 	#[inline]
-	pub fn new(string: String) -> Self {
-		string.into()
+	pub fn new() -> Self {
+		"".into()
 	}
 
 	#[inline]
@@ -242,25 +238,31 @@ where R: RefCounter {
 		self.len == 0
 	}
 
-	// returns new start and length if it is a valid range
+	// returns new start and end if it is a valid range
+	// will be equal to x..y
+	// valid: start <= end && end <= len
 	#[inline]
 	fn validate_range<I>(&self, range: I) -> Option<(usize, usize)>
-	where I: AsRange {
+	where I: ops::RangeBounds<usize> {
 
-		let (mut n_start, n_end) = range.as_range(self.len);
-		// if it is a reverse range or a range with len 0
-		if n_start >= n_end {
-			return None
-		}
+		let len = self.len();
 
-		let n_len = n_end - n_start;
-		n_start += self.start; // add offset
+		let start = match range.start_bound() {
+			Bound::Included(&i) => i,
+			Bound::Excluded(&i) => i + 1,
+			Bound::Unbounded => 0
+		};
 
-		// check that new range is not out-of-bounds
-		if n_start + n_len > self.bytes.len() {
+		let end = match range.end_bound() {
+			Bound::Included(&i) => i + 1,
+			Bound::Excluded(&i) => i,
+			Bound::Unbounded => len
+		};
+
+		if start > end || end > len {
 			None
 		} else {
-			Some((n_start, n_len))
+			Some((start, end))
 		}
 	}
 
@@ -289,19 +291,22 @@ where R: RefCounter {
 	/// ```
 	#[inline]
 	pub fn get<I>(&self, range: I) -> Option<Self>
-	where I: AsRange {
-		let (n_start, n_len) = self.validate_range(range)?;
+	where I: ops::RangeBounds<usize> {
+		let (start, end) = self.validate_range(range)?;
+
+		if start == end {
+			return Some(Self::new())
+		}
 
 		// should validate if is char boundary
-		let s = self.as_full_str();
-		if !s.is_char_boundary(n_start)
-			|| !s.is_char_boundary(n_start + n_len) {
+		let s = self.as_str();
+		if !(s.is_char_boundary(start) && s.is_char_boundary(end)) {
 			return None;
 		}
 
 		Some(Self {
-			start: n_start,
-			len: n_len,
+			start: self.start + start,
+			len: end - start,
 			bytes: self.bytes.clone()
 		})
 	}
@@ -334,19 +339,14 @@ where R: RefCounter {
 	/// assert_eq!("foobar", foobar.idx(..));
 	/// assert_eq!("bar", foobar.idx(3..));
 	/// ```
-	///
-	/// ## Todo
-	///
-	/// Replace trait `AsRange` with
-	/// [RangeBounds](https://doc.rust-lang.org/std/ops/trait.RangeBounds.html)
 	#[inline]
 	pub fn idx<I>(&self, range: I) -> Self
-	where I: AsRange {
-		let (n_start, n_len) = self.validate_range(range).unwrap();
+	where I: ops::RangeBounds<usize> {
+		let (start, end) = self.validate_range(range).expect("invalid range");
 
 		Self {
-			start: n_start,
-			len: n_len,
+			start: self.start + start,
+			len: end - start,
 			bytes: self.bytes.clone()
 		}
 	}
@@ -657,6 +657,15 @@ impl cmp::PartialEq<SharedSyncString> for &str {
 
 // need a custom ord
 
+impl<R> Default for SharedGenString<R>
+where R: RefCounter {
+	/// Creates a new empty `SharedString`.
+	#[inline]
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
 impl<R> From<String> for SharedGenString<R>
 where R: RefCounter {
 	#[inline]
@@ -785,7 +794,8 @@ mod tests {
 		assert_eq!(s.len(), 0);
 		assert!(s.is_empty());
 
-		assert!(s.get(..).is_none());
+		assert!(s.get(..).is_some());
+		assert!(s.idx(..).is_empty());
 		assert!(s.get(1..).is_none());
 	}
 
