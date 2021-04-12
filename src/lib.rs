@@ -710,12 +710,13 @@ mod tests {
 
 		let world = hello.split_off(7);
 
-		std::thread::spawn(move || {
+		let handle = std::thread::spawn(move || {
 			assert_eq!(world, "World!");
 			assert_eq!(world.as_full_str(), "Hello, World!");
 		});
 
 		assert_eq!(hello, "Hello, ");
+		handle.join().unwrap();
 	}
 
 	#[test]
