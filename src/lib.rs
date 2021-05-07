@@ -1,5 +1,5 @@
 
-//! Split a string without another allocation
+//! A `String` with shared ownership.
 //!
 //! Helpfull for some types that need to be parsed from a string
 //! and get split into smaller parts like an `Url` or a `Vec` containing lines
@@ -10,7 +10,7 @@
 //! First try to store references, for example `&str` which is more efficient.
 //!
 //! At the moment if you create a `SharedString` the underlying bytes cannot be
-//! mutated.
+//! mutated anymore.
 //!
 //! ## Example
 //!
@@ -683,6 +683,14 @@ where R: RefCounter {
 	#[inline]
 	fn from(s: &str) -> Self {
 		s.to_string().into()
+	}
+}
+
+impl<R> From<SharedGenString<R>> for String
+where R: RefCounter {
+	#[inline]
+	fn from(s: SharedGenString<R>) -> Self {
+		s.into_string()
 	}
 }
 
